@@ -1,0 +1,114 @@
+<meta charset="utf-8">
+<base target="_blank">
+<style>
+  object {
+    display: block;
+    width: 100%;
+    max-width: 400px;
+  }
+  div#chat {
+    max-height: 400px;
+    overflow: auto;
+    max-width: 60vw;
+  }
+  div.message {
+    display: flex;
+  }
+  div.message > * {
+    margin: 0;
+    padding: 5px;
+  }
+  div.message span {
+    padding-right: 20px;
+  }
+</style>
+
+<h1>Hückelhoven App-Sammlung</h1>
+
+<p>
+  Rezensionen von Lehrern und Anderen aus Hückelhoven. Lehrer und Eltern können die Sammlung nutzen, um ihre Kinder/Schüler mithilfe der Apps weiterzubilden.
+</p>
+
+<h2>aktueller Stand: <a href="Sammlung.pdf">27.07.2020 Sammlung.pdf</a></h2>
+
+<p> Mit Empfehlungen von:</p>
+<ul>
+  <li>Herr Brunnmeier (Informatik-AG Gymnasium Hückelhoven)</li>
+  <li>Herr Hennen (Medienbeauftr. & Lehrer Im Weidengrund Ratheim)</li>
+</ul>
+
+<h2>Ihre Kommentare</h2>
+
+<input id="user" placeholder="Name (optional)">
+<input id="comment" placeholder="Ihre Nachricht...">
+<button id="commentButton">Kommentieren</button>
+<div id="chat">
+</div>
+
+<br><br><br>
+
+<object id="hhmap" data="hhmap.svg" type="image/svg+xml"></object>
+
+<h2>Medienempfehlungen auf den Schulhomepages</h2>
+
+<p>Eine <a href="https://ggs-an-der-burg.de/lernplattformen">Linksammlung</a> der GGS an der Burg mit Links zu Lernplattformen, ohne Beschreibung.</p>
+<p><a href="https://www.wir-in-der-schlee.de/Infos/Aktuelles/aktuelles.html">Linksammlung</a> der Hauptschule in der Schlee zu Medien- und Schulfernsehbeiträgen, empfohlen vom Schulamt (Medienteam), mit Beschreibung.</p>
+<p>Eine <a href="http://mes-ratheim.de/Lernen-im-Netz">Linksammlung</a> der MES Ratheim.</p>
+<p>Eine <a href="https://www.ggs-hilfarth.de/links/links-fuer-schueler.html">Linksammlung</a> mit Videos und Lernseiten der GGS Hilfarth.</p>
+<br>
+<p>
+  Fragen, Anmerkungen oder Feedback können Sie gerne an adam.brunnmeier@gmail.com richten.
+</p>
+
+
+<script>
+  var commentButton = document.getElementById("commentButton")
+  commentButton.onclick = async function() {
+    let user = document.getElementById("user").value
+    localStorage.user = user
+    let message = document.getElementById("comment").value
+    // PUT message
+    commentButton.disabled = true
+    await fetch('putComment', {
+      method: 'PUT',
+      body: JSON.stringify({user, message})
+    })
+    await updateChat()
+    commentButton.disabled = false
+  }
+  if (localStorage.user == null)
+    localStorage.user = ""
+  document.getElementById("user").value = localStorage.user
+  updateChat()
+  function hash(s) {
+    // https://stackoverflow.com/a/7616484/6040478
+    s += 'xx'
+    var hash = 0, i, chr;
+    for (i = 0; i < s.length; i++) {
+      chr   = s.charCodeAt(i);
+      hash  = ((hash << 5) - hash) + chr;
+      hash |= 0; // Convert to 32bit integer
+    }
+    return hash
+  }
+  async function updateChat() {
+    let response = await fetch('getComments')
+    let messages = await response.json()
+    var chat = document.getElementById("chat")
+    chat.innerHTML = ""
+    for (let {user, message} of messages.slice().reverse()) {
+      let elementDiv = document.createElement("div")
+      elementDiv.className = "message"
+      chat.appendChild(elementDiv)
+      let elementUser = document.createElement("span")
+      let username = user || '(anonym)'
+      elementUser.textContent = username + ':'
+      let color = hash(username)
+      elementUser.style.color = `rgb(${color >> 0 & 0xff},${color >> 8 & 0xff},${color >> 16 & 0xff})`
+      let elementMessage = document.createElement("p")
+      elementMessage.append(elementUser, message)
+      elementDiv.append(elementMessage)
+    }
+  }
+  setInterval(updateChat, 2000)
+</script>
