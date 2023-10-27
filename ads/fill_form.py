@@ -6,78 +6,7 @@ from sys import argv, stdin
 import requests
 from pathlib import Path
 
-#  JSON.stringify( [...$0.options].reduce((a, x) => {a[x.innerText]=x.value; return a}, {}) )
-_C = {
-    "Messe": "2077",
-    "Sitzungen": "89",
-    "Tag der offenen Tür": "653",
-    "verkaufsoffene Sonntage": "260",
-    "Bildung": "78",
-    "Kindergarten": "657",
-    "Veranstaltungen der Gleichstellungsbeauftragten": "261",
-    "Kino": "565",
-    "Jam Session": "650",
-    "Lesung": "1924",
-    "Termin": "90",
-    "Offenes Singen": "254",
-    "Feiern": "74",
-    "Sport": "76",
-    "Comedy/Kabarett": "258",
-    "Kultur": "77",
-    "Traditionelle Veranstaltungen": "259",
-    "Theater": "257",
-    "Ausstellungen": "256",
-    "Events": "75",
-    "Märkte": "73",
-    "Sonstiges": "255",
-    "Konzert": "253",
-    "Highlight": "138",
-}
-_P = {
-    "Altmyhl": "190",
-    "Schaufenberg": "200",
-    "Kleingladbach": "196",
-    "Doveren": "193",
-    "Millich": "197",
-    "Rurich": "199",
-    "Brachelen": "192",
-    "Baal": "191",
-    "Hilfarth": "194",
-    "Ratheim": "198",
-    "Hückelhoven": "195",
-}
-
-forms = {
-    "silke": {
-        "title": "Offener Nähtreff",
-        "date": datetime.fromisoformat("2023-08-28T14:30:00"),
-        "duration": timedelta(hours=3),
-        "category": _C["Kultur"],
-        "place": _P["Hückelhoven"],
-        "address": "Friedrichplatz 7",
-        "description": """Interkultureller Nähtreff mit Kinderbetreuung. Im Vordergrund steht die gemeinsame Freude am Nähen und das offene Gespräch miteinander. NähanfängerInnen sind genauso willkommen wie Fortgeschrittene. Die Kinder werden während der Kurszeit betreut.
-
-Jeden Montag von 14:30 Uhr bis 17:30 Uhr im Begegnungszentrum.
-Leitung Silke Löwenkamp, famkrack{:} .""".format(
-            "@googlemail.com"
-        ),
-    },
-    "ela": {
-        "title": "Offener Näh- und Handarbeitstreff",
-        "date": datetime.fromisoformat("2023-08-29T10:00:00"),
-        "duration": timedelta(hours=3),
-        "category": _C["Kultur"],
-        "place": _P["Hückelhoven"],
-        "address": "Rheinstraße 103",
-        "description": """Offener Näh- und Handarbeitstreff für Jung und Alt. Im Vordergrund steht die gemeinsame Freude am Nähen, Häkeln und Stricken. Anfänger/innen sind genauso willkommen wie Fortgeschrittene. Es wird für den guten Zweck oder an privaten Projekten gearbeitet. Schau gerne mal vorbei!
-
-Jeden Dienstag von 10 Uhr bis 13 Uhr im DRK Hückelhoven.
-
-Kontakt: Manuela Backes, 0176 {:}.""".format(
-            "81416805"
-        ),
-    },
-}
+from forms import forms, groups, _P, _C
 
 
 base = Path(__file__).resolve().parent
@@ -89,25 +18,43 @@ def run_resize():
         if dir.is_dir():
             for i in range(1, 6):
                 image = dir.joinpath("{:}.jpg".format(i))
-                if image.is_file():
+                target = dir.joinpath("small", image.name)
+                if image.is_file() and (
+                    not target.is_file()
+                    or image.stat().st_mtime > target.stat().st_mtime
+                ):
                     print(image)
                     dir.joinpath("small").mkdir(exist_ok=True)
                     subprocess.run(
                         "convert {:} -resize 1500x1500> -quality 75 {:}".format(
-                            image, dir.joinpath("small", image.name)
+                            image, target
                         ).split(" ")
                     )
 
 
 def get_data(label, count):
-    form = forms[label]
+    # normal recurring event
+    if label in forms:
+        form = forms[label]
 
-    # count date forward to "today + count"
-    date = form["date"]
-    while date < datetime.now():
-        date += timedelta(weeks=1)
-    for i in range(int(count)):
-        date += timedelta(weeks=1)
+        # count date forward to "today + count"
+        dates = form["date"]
+        date = next(dates)
+        for i in range(int(count)):
+            date = next(dates)
+    # group of events
+    elif label in groups:
+        dates = {k: forms[k]["date"] for k in groups[label]}
+        dates_next = {k: next(dates[k]) for k in dates}
+        date = None
+        for i in range(int(count) + 1):
+            k_next = min(dates_next, key=dates_next.get)
+            date = dates_next[k_next]
+            try:
+                dates_next[k_next] = next(dates[k_next])
+            except StopIteration:
+                del dates_next[k_next]
+            form = forms[k_next]
 
     data = {
         "customer_event_title": form["title"],
@@ -136,17 +83,26 @@ def run_post(label, count):
     data = get_data(label, count)
     data["submit-customer-event"] = "1"
 
+    # add some headers, just to be safe
     headers = {
-        "Content-Type": "multipart/form-data",
+        "Origin": "https://www.hueckelhoven.de",
+        "Referer": "https://www.hueckelhoven.de/termineingabe/",
     }
 
     files = {}
     for i in range(1, 6):
         image = base.joinpath(label, "small/{:}.jpg".format(i))
+        name = "customer_event_image{:}".format(i)
         if image.is_file():
-            files["customer_event_image{:}".format(i)] = open(image, "rb")
+            files[name] = (image.name, open(image, "rb"), "image/jpeg")
+        else:
+            files[name] = ("", "", "application/octet-stream")
+    files["customer_event_file"] = ("", "", "application/octet-stream")
 
     endpoint = "https://www.hueckelhoven.de/termineingabe/"
+
+    def reverse_lookup(dict: dict, what):
+        return next(key for key, value in dict.items() if value == what)
 
     print(
         "{:}-{:}-{:}   {:}-{:}".format(
@@ -157,11 +113,30 @@ def run_post(label, count):
             data["customer_event_date_time_2"],
         )
     )
+    print(
+        "({:}) Hückelhoven-{:}, {:}".format(
+            reverse_lookup(_C, data["customer_event_category"]),
+            reverse_lookup(_P, data["customer_event_place"]),
+            data["customer_event_place_2"],
+        )
+    )
+    print("\033[1m{:}\033[22m".format(data["customer_event_title"]))
     print(data["customer_event_description"])
     print("\n\nPlease press enter to post...")
     stdin.readline()
-    response = requests.post(endpoint, headers=headers, data=data, files=files)
-    print(response)
+
+    # post with cookie, my posts didn't arrive on the page previously
+    s = requests.Session()
+    # allow sending request to debug server
+    # s.verify = base.joinpath("debug_cert.pem")
+    s.get(endpoint).raise_for_status()
+    # browser client sends data as content-disposition
+    # response = s.post(endpoint, headers=headers, files={**data, **files})
+    response = s.post(endpoint, headers=headers, data=data, files=files)
+    response.raise_for_status()
+    print(response.headers)
+    with open("log.html", "w") as f:
+        f.write(response.text)
 
 
 def run_inject(label, count):
@@ -177,19 +152,106 @@ def run_inject(label, count):
     subprocess.run(["wl-copy", script])
 
 
+def run_debugserve():
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from time import time
+    from threading import Thread
+    import os
+    import ssl
+
+    if os.geteuid() != 0:
+        print("Run as root (serve on port 80, edit /etc/hosts). Exiting.")
+        exit()
+
+    class LogServer(BaseHTTPRequestHandler):
+        def do_GET(self):
+            # feed cookie
+            self.send_response(200)
+            self.send_header("Set-Cookie", "DEBUG")
+            self.end_headers()
+
+        def do_POST(self):
+            head = "{:}\n{:}".format(
+                self.requestline,
+                self.headers,
+            )
+            length = int(self.headers["Content-Length"])
+            body = self.rfile.read(length)
+            base.joinpath("log").mkdir(exist_ok=True)
+            with open(base.joinpath("log", str(time())), "wb") as f:
+                f.write(head.encode())
+                f.write(body)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write("Request received.".encode())
+
+    ip = "127.0.0.45"
+    with open("/etc/hosts") as f:
+        hosts = f.read()
+    # redirect www.hueckelhoven.de to localhost
+    hosts = hosts.replace("#" + ip, ip)
+    with open("/etc/hosts", "w") as f:
+        f.write(hosts)
+
+    with HTTPServer((ip, 443), LogServer) as httpd:
+        # openssl req -x509 -newkey rsa:4096 -keyout debug_key.pem -out debug_cert.pem -nodes \
+        #   -days 1 -subj "/C=DE/CN=www.hueckelhoven.de/O=adabru" -addext "subjectAltName = DNS:www.hueckelhoven.de"
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(
+            base.joinpath("debug_cert.pem"),
+            keyfile=base.joinpath("debug_key.pem"),
+        )
+        httpd.socket = context.wrap_socket(
+            httpd.socket,
+            server_side=True,
+        )
+        print("serving at {:}".format(ip))
+        t = Thread(target=httpd.serve_forever)
+        t.start()
+        print("press enter to exit...")
+        input()
+        httpd.shutdown()
+        with open("/etc/hosts", "w") as f:
+            # remove redirection
+            hosts = hosts.replace(ip, "#" + ip)
+            f.write(hosts)
+
+
 if len(argv) == 2 and argv[1] == "resize":
     run_resize()
-elif len(argv) == 4 and argv[1] == "post" and argv[2] in forms:
+elif len(argv) == 4 and argv[1] == "post" and argv[2] in {**forms, **groups}:
     label = argv[2]
     count = argv[3]
     run_post(label, count)
-elif len(argv) == 4 and argv[1] == "inject" and argv[2] in forms:
+elif len(argv) == 4 and argv[1] == "inject" and argv[2] in {**forms, **groups}:
     label = argv[2]
     count = argv[3]
     run_inject(label, count)
+elif len(argv) == 2 and argv[1] == "debugserve":
+    try:
+        run_debugserve()
+    except subprocess.CalledProcessError:
+        pass
 else:
     print(
-        "usage:\n\n  fill_form.py (inject | post) ({:}) <0-9>\n\n  fill_form.py resize\n".format(
-            " | ".join(forms.keys())
+        "usage:\n\n  fill_form.py (inject | post ) (event | group) <0-9>\n\n  fill_form.py resize\n  fill_form.py debugserve\n\ngroups: {:}\nevents: {:}\n\n".format(
+            ", ".join(groups.keys()), ", ".join(forms.keys())
         )
     )
+
+
+# update sudo credential cache
+# subprocess.run("sudo -v".split(" "), check=True)
+# forward traffic from 80 to 8080
+# pSocat = subprocess.Popen(
+#     "sudo -n socat TCP4-LISTEN:80,fork,su=nobody TCP4:{:}:8080".format(ip).split(
+#         " "
+#     ),
+#     stdin=subprocess.PIPE,
+#     stdout=subprocess.PIPE,
+# )
+# point endpoint to localhost
+# subprocess.run(
+#     "sudo sed -i -E s/#(.*www.hueckelhoven.de)/\1/ /etc/hosts".split(" "),
+#     check=True,
+# )
