@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from datetime import datetime, timedelta
+import json
 import subprocess
 from sys import argv, stdin
 import requests
@@ -11,10 +12,30 @@ from forms import forms, groups, _P, _C
 
 base = Path(__file__).resolve().parent
 
+# load posts.json which stores the posts already uploaded
+
+
+def load_posts():
+    try:
+        with open("posts.json", "r") as file:
+            posts = json.load(file)
+    except FileNotFoundError:
+        posts = {}
+    return posts
+
+
+def save_posts(posts):
+    with open("posts.json.tmp", "w") as file:
+        json.dump(posts, file, indent=2)
+    Path("posts.json.tmp").replace("posts.json")
+
+
+posts = load_posts()
+
 
 def run_resize():
     # prepare images and exit
-    for dir in base.iterdir():
+    for dir in base.joinpath("images").iterdir():
         if dir.is_dir():
             for i in range(1, 6):
                 image = dir.joinpath("{:}.jpg".format(i))
@@ -32,19 +53,23 @@ def run_resize():
                     )
 
 
-def get_data(label, count):
+def get_data(label_or_group, count):
+    label = None
+
     # normal recurring event
-    if label in forms:
-        form = forms[label]
+    if label_or_group in forms:
+        form = forms[label_or_group]
 
         # count date forward to "today + count"
         dates = form["date"]
         date = next(dates)
         for i in range(int(count)):
             date = next(dates)
+        label = label_or_group
+
     # group of events
-    elif label in groups:
-        dates = {k: forms[k]["date"] for k in groups[label]}
+    elif label_or_group in groups:
+        dates = {k: forms[k]["date"] for k in groups[label_or_group]}
         dates_next = {k: next(dates[k]) for k in dates}
         date = None
         for i in range(int(count) + 1):
@@ -53,8 +78,10 @@ def get_data(label, count):
             try:
                 dates_next[k_next] = next(dates[k_next])
             except StopIteration:
+                # this label has no more dates, remove it
                 del dates_next[k_next]
             form = forms[k_next]
+            label = k_next
 
     data = {
         "customer_event_title": form["title"],
@@ -76,11 +103,11 @@ def get_data(label, count):
         "customer_datenschutz": "1",
         "customer_datenschutz2": "1",
     }
-    return data
+    return (data, label)
 
 
-def run_post(label, count):
-    data = get_data(label, count)
+def run_post(label_or_group, count):
+    (data, label) = get_data(label_or_group, count)
     data["submit-customer-event"] = "1"
 
     # add some headers, just to be safe
@@ -91,7 +118,7 @@ def run_post(label, count):
 
     files = {}
     for i in range(1, 6):
-        image = base.joinpath(label, "small/{:}.jpg".format(i))
+        image = base.joinpath("images", label, "small/{:}.jpg".format(i))
         name = "customer_event_image{:}".format(i)
         if image.is_file():
             files[name] = (image.name, open(image, "rb"), "image/jpeg")
@@ -122,6 +149,12 @@ def run_post(label, count):
     )
     print("\033[1m{:}\033[22m".format(data["customer_event_title"]))
     print(data["customer_event_description"])
+    print()
+    print(files["customer_event_image1"])
+    print(files["customer_event_image2"])
+    print(files["customer_event_image3"])
+    print(files["customer_event_image4"])
+    print(files["customer_event_image5"])
     print("\n\nPlease press enter to post...")
     stdin.readline()
 
@@ -139,8 +172,8 @@ def run_post(label, count):
         f.write(response.text)
 
 
-def run_inject(label, count):
-    data = get_data(label, count)
+def run_inject(label_or_group, count):
+    (data, _) = get_data(label_or_group, count)
 
     script = ""
     for k, v in data.items():

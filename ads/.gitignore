@@ -1,7 +1,7 @@
-*/*.jpg
-*/small/*.jpg
+*.jpg
 __pycache__/
 log.html
 log/
 debug_cert.pem
 debug_key.pem
+posts.json

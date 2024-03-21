@@ -41,7 +41,11 @@ def weekly(weekday: str, time: str):
 
 
 def fixed(*dates: str):
-    return iter([datetime.fromisoformat(date) for date in dates])
+    for date in dates:
+        _date = datetime.fromisoformat(date)
+        if _date < datetime.now():
+            continue
+        yield _date
 
 
 #  JSON.stringify( [...$0.options].reduce((a, x) => {a[x.innerText]=x.value; return a}, {}) )
@@ -111,6 +115,15 @@ Jeden Dienstag von 10 Uhr bis 13 Uhr im DRK Hückelhoven.
 
 Kontakt: Manuela Backes, 0176 _XXX_81416805""",
     },
+    "heike": {
+        "title": "Offener Näh- und Handarbeitstreff",
+        "date": weekly("thursday", "17:30"),
+        "duration": timedelta(hours=2),
+        "category": _C["Kultur"],
+        "place": _P["Hückelhoven"],
+        "address": "Dr. Ruben-Straße 10",
+        "description": """Offener Näh- und Handarbeitstreff in Kathis Pedalotreff. Schau gerne mal vorbei! Jeden Donnerstag von 1730 Uhr bis 1930 Uhr.""",
+    },
     "efg": {
         "title": "Gottesdienst",
         "date": weekly("sunday", "10:00"),
@@ -162,6 +175,7 @@ https://www.youtube.com/channel/UCENZN_mYZurANrfSxNjZRjw
         "address": "Rathausplatz",
         "description": """Großer Wochenmarkt rund ums Hückelhovener Rathaus. Freitags 08.00 Uhr bis 12.30 Uhr.""",
     },
+    # https://www.vianobis-eingliederungshilfe.de/termine
     "repair": {
         "duration": timedelta(hours=3),
         "category": _C["Kultur"],
@@ -180,8 +194,9 @@ for _, form in forms.items():
 groups = {
     "nori": ["nori_schacht4", "nori_centershop"],
     "markt": ["nori_schacht4", "nori_centershop", "wochenmarkt"],
-    "kai": [],
-    "katho": [],
+    "kai": ["ela"],
+    "katho": ["silke"],
+    "pedalo": ["maike"],
 }
 
 # efg_frauen
