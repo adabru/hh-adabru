@@ -12,14 +12,20 @@ _W = {
 }
 
 
+def get_time() -> datetime:
+    date = datetime.now()
+    date = date.replace(minute=0, second=0, microsecond=0)
+    return date
+
+
 def monthly(weekday: str, time: str):
     h, m = time.split(":")
-    date = datetime.now()
+    date = get_time()
     while date.minute != int(m):
         date = date + timedelta(minutes=1)
     while date.hour != int(h):
         date = date + timedelta(hours=1)
-    while date < datetime.now() + timedelta(weeks=50):
+    while True:
         while date.day > 7 or date.weekday() != _W[weekday]:
             date = date + timedelta(days=1)
         yield date
@@ -28,14 +34,14 @@ def monthly(weekday: str, time: str):
 
 def weekly(weekday: str, time: str):
     h, m = time.split(":")
-    date = datetime.now()
+    date = get_time()
     while date.minute != int(m):
         date = date + timedelta(minutes=1)
     while date.hour != int(h):
         date = date + timedelta(hours=1)
     while date.weekday() != _W[weekday]:
         date = date + timedelta(days=1)
-    while date < datetime.now() + timedelta(weeks=50):
+    while True:
         yield date
         date += timedelta(weeks=1)
 
@@ -147,8 +153,17 @@ https://www.youtube.com/channel/UCENZN_mYZurANrfSxNjZRjw
         "category": _C["Märkte"],
         "title": "Trödelmarkt Schacht 4",
         "date": fixed(
-            "2023-11-19T11:00:00",
-            "2023-12-17T11:00:00",
+            "2024-03-31T11:00:00",
+            "2024-04-01T11:00:00",
+            "2024-04-21T11:00:00",
+            "2024-05-19T11:00:00",
+            "2024-06-23T11:00:00",
+            "2024-07-21T11:00:00",
+            "2024-08-18T11:00:00",
+            "2024-09-22T11:00:00",
+            "2024-10-20T11:00:00",
+            "2024-11-17T11:00:00",
+            "2024-12-15T11:00:00",
         ),
         "place": _P["Ratheim"],
         "address": "Myhler Straße 81",
@@ -159,8 +174,13 @@ https://www.youtube.com/channel/UCENZN_mYZurANrfSxNjZRjw
         "category": _C["Märkte"],
         "title": "Trödelmarkt Center Shop",
         "date": fixed(
-            "2023-10-22T11:00:00",
-            "2023-12-10T11:00:00",
+            "2024-05-05T11:00:00",
+            "2024-05-30T11:00:00",
+            "2024-06-30T11:00:00",
+            "2024-08-25T11:00:00",
+            "2024-09-29T11:00:00",
+            "2024-10-27T11:00:00",
+            "2024-12-08T11:00:00",
         ),
         "place": _P["Hückelhoven"],
         "address": "Rheinstr. 17",
@@ -197,6 +217,14 @@ groups = {
     "kai": ["ela"],
     "katho": ["silke"],
     "pedalo": ["maike"],
+    "all": [
+        "nori_schacht4",
+        "nori_centershop",
+        "wochenmarkt",
+        "repair",
+        "silke",
+        "ela",
+    ],
 }
 
 # efg_frauen

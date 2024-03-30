@@ -5,3 +5,4 @@ log/
 debug_cert.pem
 debug_key.pem
 posts.json
+posts.json.tmp

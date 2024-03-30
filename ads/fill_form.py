@@ -15,25 +15,25 @@ base = Path(__file__).resolve().parent
 # load posts.json which stores the posts already uploaded
 
 
-def load_posts():
+def load_posts() -> dict:
     try:
-        with open("posts.json", "r") as file:
+        with open(base.joinpath("posts.json"), "r") as file:
             posts = json.load(file)
     except FileNotFoundError:
         posts = {}
     return posts
 
 
-def save_posts(posts):
-    with open("posts.json.tmp", "w") as file:
+def save_posts(posts) -> None:
+    with open(base.joinpath("posts.json.tmp"), "w") as file:
         json.dump(posts, file, indent=2)
-    Path("posts.json.tmp").replace("posts.json")
+    base.joinpath("posts.json.tmp").replace(base.joinpath("posts.json"))
 
 
 posts = load_posts()
 
 
-def run_resize():
+def run_resize() -> None:
     # prepare images and exit
     for dir in base.joinpath("images").iterdir():
         if dir.is_dir():
@@ -53,37 +53,62 @@ def run_resize():
                     )
 
 
-def get_data(label_or_group, count):
-    label = None
+class AlreadyPostedException(Exception):
+    """Thrown if the next event for the specified label was already posted."""
+
+    pass
+
+
+def get_next_event(label_or_group: str) -> tuple[dict, str, datetime]:
+    """
+    Get next event to schedule. Already posted events are skipped (posts.json).
+
+    Args:
+        label_or_group: For events, the label of the event. For groups, the label of the group. The next event of the group is returned.
+    """
+
+    def get_next_unpublished_date(label) -> datetime:
+        # add new dictionary if event is new
+        if label not in posts:
+            posts[label] = {}
+
+        dates = forms[label]["date"]
+        date = next(dates)
+        if date.isoformat() in posts[label]:
+            raise AlreadyPostedException("Event on {:} already posted.".format(date))
+        return date
 
     # normal recurring event
     if label_or_group in forms:
-        form = forms[label_or_group]
-
-        # count date forward to "today + count"
-        dates = form["date"]
-        date = next(dates)
-        for i in range(int(count)):
-            date = next(dates)
         label = label_or_group
+        date = get_next_unpublished_date(label)
 
     # group of events
     elif label_or_group in groups:
-        dates = {k: forms[k]["date"] for k in groups[label_or_group]}
-        dates_next = {k: next(dates[k]) for k in dates}
-        date = None
-        for i in range(int(count) + 1):
-            k_next = min(dates_next, key=dates_next.get)
-            date = dates_next[k_next]
+        group = label_or_group
+        # get next event for every label in the group
+        dates = {}
+        error_message = ""
+        for k in groups[group]:
             try:
-                dates_next[k_next] = next(dates[k_next])
+                dates[k] = get_next_unpublished_date(k)
+            except AlreadyPostedException as e:
+                error_message += str(e) + "\n"
             except StopIteration:
-                # this label has no more dates, remove it
-                del dates_next[k_next]
-            form = forms[k_next]
-            label = k_next
+                pass
+        if not dates:
+            raise AlreadyPostedException(
+                "All events in group {:} already posted or none left.\n{:}".format(
+                    group, error_message
+                )
+            )
+        # get next event
+        label = min(dates, key=dates.get)
+        date = dates[label]
 
-    data = {
+    form = forms[label]
+
+    event = {
         "customer_event_title": form["title"],
         "customer_event_date_day": date.day,
         "customer_event_date_month": date.month,
@@ -103,11 +128,16 @@ def get_data(label_or_group, count):
         "customer_datenschutz": "1",
         "customer_datenschutz2": "1",
     }
-    return (data, label)
+    return (event, label, date)
 
 
-def run_post(label_or_group, count):
-    (data, label) = get_data(label_or_group, count)
+def run_post(label_or_group: str) -> None:
+    try:
+        (data, label, date) = get_next_event(label_or_group)
+    except AlreadyPostedException as e:
+        print(e)
+        return
+
     data["submit-customer-event"] = "1"
 
     # add some headers, just to be safe
@@ -155,16 +185,35 @@ def run_post(label_or_group, count):
     print(files["customer_event_image3"])
     print(files["customer_event_image4"])
     print(files["customer_event_image5"])
-    print("\n\nPlease press enter to post...")
-    stdin.readline()
+    print(
+        "\n\nPlease type a message to skip this event or leave empty to upload it.\nYour message: ",
+        end="",
+    )
+    try:
+        message = stdin.readline().strip()
+    except KeyboardInterrupt:
+        print("\n\nCancelled.")
+        return
+
+    # add post to posts.json
+    if message == "":
+        posts[label][date.isoformat()] = "posted on " + datetime.now().isoformat()
+        save_posts(posts)
+    else:
+        posts[label][date.isoformat()] = "skipped: " + message
+        save_posts(posts)
+        print("skipped")
+        return
 
     # post with cookie, my posts didn't arrive on the page previously
     s = requests.Session()
+
     # allow sending request to debug server
     # s.verify = base.joinpath("debug_cert.pem")
+
     s.get(endpoint).raise_for_status()
+
     # browser client sends data as content-disposition
-    # response = s.post(endpoint, headers=headers, files={**data, **files})
     response = s.post(endpoint, headers=headers, data=data, files=files)
     response.raise_for_status()
     print(response.headers)
@@ -173,7 +222,7 @@ def run_post(label_or_group, count):
 
 
 def run_inject(label_or_group, count):
-    (data, _) = get_data(label_or_group, count)
+    (data, _) = get_next_event(label_or_group, count)
 
     script = ""
     for k, v in data.items():
@@ -252,14 +301,12 @@ def run_debugserve():
 
 if len(argv) == 2 and argv[1] == "resize":
     run_resize()
-elif len(argv) == 4 and argv[1] == "post" and argv[2] in {**forms, **groups}:
+elif len(argv) == 3 and argv[1] == "post" and argv[2] in {**forms, **groups}:
     label = argv[2]
-    count = argv[3]
-    run_post(label, count)
-elif len(argv) == 4 and argv[1] == "inject" and argv[2] in {**forms, **groups}:
+    run_post(label)
+elif len(argv) == 3 and argv[1] == "inject" and argv[2] in {**forms, **groups}:
     label = argv[2]
-    count = argv[3]
-    run_inject(label, count)
+    run_inject(label)
 elif len(argv) == 2 and argv[1] == "debugserve":
     try:
         run_debugserve()
@@ -267,7 +314,7 @@ elif len(argv) == 2 and argv[1] == "debugserve":
         pass
 else:
     print(
-        "usage:\n\n  fill_form.py (inject | post ) (event | group) <0-9>\n\n  fill_form.py resize\n  fill_form.py debugserve\n\ngroups: {:}\nevents: {:}\n\n".format(
+        "usage:\n\n  fill_form.py (inject | post ) (event | group)\n\n  fill_form.py resize\n  fill_form.py debugserve\n\ngroups: {:}\nevents: {:}\n\n".format(
             ", ".join(groups.keys()), ", ".join(forms.keys())
         )
     )
