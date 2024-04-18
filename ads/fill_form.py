@@ -67,13 +67,21 @@ def get_next_event(label_or_group: str) -> tuple[dict, str, datetime]:
         label_or_group: For events, the label of the event. For groups, the label of the group. The next event of the group is returned.
     """
 
-    def get_next_unpublished_date(label) -> datetime:
+    def get_next_unpublished_date(label, publishing_offset=3) -> datetime:
+        """
+        Get next unpublished date for event "label". Raises AlreadyPostedException if event was already posted.
+        The publishing_offset is used to skip events that are too close to the current date.
+        """
         # add new dictionary if event is new
         if label not in posts:
             posts[label] = {}
 
         dates = forms[label]["date"]
+        now = datetime.now()
+        # skip events that are too close to the current date, also making following events earlier visible
         date = next(dates)
+        while date < now + timedelta(days=publishing_offset):
+            date = next(dates)
         if date.isoformat() in posts[label]:
             raise AlreadyPostedException("Event on {:} already posted.".format(date))
         return date
@@ -318,20 +326,3 @@ else:
             ", ".join(groups.keys()), ", ".join(forms.keys())
         )
     )
-
-
-# update sudo credential cache
-# subprocess.run("sudo -v".split(" "), check=True)
-# forward traffic from 80 to 8080
-# pSocat = subprocess.Popen(
-#     "sudo -n socat TCP4-LISTEN:80,fork,su=nobody TCP4:{:}:8080".format(ip).split(
-#         " "
-#     ),
-#     stdin=subprocess.PIPE,
-#     stdout=subprocess.PIPE,
-# )
-# point endpoint to localhost
-# subprocess.run(
-#     "sudo sed -i -E s/#(.*www.hueckelhoven.de)/\1/ /etc/hosts".split(" "),
-#     check=True,
-# )
