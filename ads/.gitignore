@@ -4,5 +4,5 @@ log.html
 log/
 debug_cert.pem
 debug_key.pem
-db/
+db
 scrapes

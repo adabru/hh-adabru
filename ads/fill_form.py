@@ -270,13 +270,19 @@ def run_debugserve():
         f.write(hosts)
 
     with HTTPServer((ip, 443), LogServer) as httpd:
-        # openssl req -x509 -newkey rsa:4096 -keyout debug_key.pem -out debug_cert.pem -nodes \
-        #   -days 1 -subj "/C=DE/CN=www.hueckelhoven.de/O=adabru" -addext "subjectAltName = DNS:www.hueckelhoven.de"
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(
-            base.joinpath("debug_cert.pem"),
-            keyfile=base.joinpath("debug_key.pem"),
-        )
+        try:
+            context.load_cert_chain(
+                base.joinpath("debug_cert.pem"),
+                keyfile=base.joinpath("debug_key.pem"),
+            )
+        except FileNotFoundError:
+            print("No debug certificate found. Run command\n")
+            print(
+                'openssl req -x509 -newkey rsa:4096 -keyout debug_key.pem -out debug_cert.pem -nodes -days 1 -subj "/C=DE/CN=www.hueckelhoven.de/O=adabru" -addext "subjectAltName = DNS:www.hueckelhoven.de"'
+            )
+            print("\nExiting.")
+            exit()
         httpd.socket = context.wrap_socket(
             httpd.socket,
             server_side=True,
