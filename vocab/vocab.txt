@@ -1,0 +1,31 @@
+Guten Morgen.
+gut
+der Morgen
+Wie geht es dir?
+Wie
+gehen
+es
+dir
+Mir geht es gut.
+mir
+Das Paket ist schwer.
+das Paket
+schwer
+Ich brauche Hilfe.
+Ich
+brauchen
+die Hilfe
+Ich bin krank.
+krank
+Achte auf den Abstand zwischen den Paketen!
+Gib Gas!
+geben
+das Gas
+Geh an Tor fünf!
+gehen
+das Tor
+fünf
+Öffne das Tor!
+öffnen
+Schließe das Tor!
+schließen

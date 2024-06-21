@@ -130,7 +130,7 @@ Kontakt: Manuela Backes, 0176 _XXX_81416805""",
         "address": "Dr. Ruben-Straße 10",
         "description": """Offener Näh- und Handarbeitstreff in Kathis Pedalotreff. Schau gerne mal vorbei! Jeden Donnerstag von 1730 Uhr bis 1930 Uhr.""",
     },
-    "efg": {
+    "messe_efg": {
         "title": "Gottesdienst",
         "date": weekly("sunday", "10:00"),
         "duration": timedelta(hours=1.5),
@@ -167,7 +167,7 @@ https://www.youtube.com/channel/UCENZN_mYZurANrfSxNjZRjw
         ),
         "place": _P["Ratheim"],
         "address": "Myhler Straße 81",
-        "description": """Trödelmarkt, auch Neuwaren. Für Standanmeldung oder Kontakt: https://www.marktcom.de/veranstaltung/troedelmarkt-in-41836-hueckelhoven-ratheim?term_id=1066561""",
+        "description": """Trödelmarkt, auch Neuwaren. Für Standanmeldung oder Kontakt: https://www.marktcom.de/veranstaltung/schacht-iv-41836-hueckelhoven""",
     },
     "nori_centershop": {
         "duration": timedelta(hours=7),
@@ -224,6 +224,7 @@ groups = {
         "repair",
         "silke",
         "ela",
+        # "ekir_messe",
     ],
 }
 

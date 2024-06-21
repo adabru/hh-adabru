@@ -7,6 +7,7 @@ from sys import argv, stdin
 import requests
 from pathlib import Path
 
+from db import load_db, save_db
 from forms import forms, groups, _P, _C
 
 
@@ -15,22 +16,7 @@ base = Path(__file__).resolve().parent
 # load posts.json which stores the posts already uploaded
 
 
-def load_posts() -> dict:
-    try:
-        with open(base.joinpath("posts.json"), "r") as file:
-            posts = json.load(file)
-    except FileNotFoundError:
-        posts = {}
-    return posts
-
-
-def save_posts(posts) -> None:
-    with open(base.joinpath("posts.json.tmp"), "w") as file:
-        json.dump(posts, file, indent=2)
-    base.joinpath("posts.json.tmp").replace(base.joinpath("posts.json"))
-
-
-posts = load_posts()
+posts = load_db("posts")
 
 
 def run_resize() -> None:
@@ -206,10 +192,10 @@ def run_post(label_or_group: str) -> None:
     # add post to posts.json
     if message == "":
         posts[label][date.isoformat()] = "posted on " + datetime.now().isoformat()
-        save_posts(posts)
+        save_db("posts", posts)
     else:
         posts[label][date.isoformat()] = "skipped: " + message
-        save_posts(posts)
+        save_db("posts", posts)
         print("skipped")
         return
 
@@ -315,6 +301,10 @@ elif len(argv) == 3 and argv[1] == "post" and argv[2] in {**forms, **groups}:
 elif len(argv) == 3 and argv[1] == "inject" and argv[2] in {**forms, **groups}:
     label = argv[2]
     run_inject(label)
+elif len(argv) == 2 and argv[1] == "scrape":
+    from scraper import run_scrape
+
+    run_scrape()
 elif len(argv) == 2 and argv[1] == "debugserve":
     try:
         run_debugserve()
