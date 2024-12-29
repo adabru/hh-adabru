@@ -1,15 +1,13 @@
 #!/usr/bin/env python
 
-from datetime import datetime, timedelta
-import json
 import subprocess
-from sys import argv, stdin
-import requests
+from datetime import datetime, timedelta
 from pathlib import Path
+from sys import argv, stdin
 
+import requests
 from db import load_db, save_db
-from forms import forms, groups, _P, _C
-
+from forms import _C, _P, forms, groups
 
 base = Path(__file__).resolve().parent
 
@@ -229,11 +227,11 @@ def run_inject(label_or_group, count):
 
 
 def run_debugserve():
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-    from time import time
-    from threading import Thread
     import os
     import ssl
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from threading import Thread
+    from time import time
 
     if os.geteuid() != 0:
         print("Run as root (serve on port 80, edit /etc/hosts). Exiting.")

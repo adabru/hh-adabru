@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-
 _W = {
     "monday": 0,
     "tuesday": 1,
@@ -222,7 +221,7 @@ groups = {
         "nori_centershop",
         "wochenmarkt",
         "repair",
-        "silke",
+        # "silke",
         "ela",
         # "ekir_messe",
     ],
